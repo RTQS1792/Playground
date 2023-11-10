@@ -50,13 +50,31 @@ IGNORED_WORDS = {
     "except",
 }
 
+EMOJIS = [
+    "📝 Add Documentation",
+    "✅ Pass",
+    "🎉 Start",
+    "💾 Save",
+    "🔥 Remove",
+    "🛠️ Fix",
+    "🔧 Update",
+    "🧩 Added",
+    "🧪 Need Testing",
+    "📖 Readme",
+    "🏗️",
+    "💨 Hotfix",
+]
+
+# Check if the current directory is a git repository
 def is_git_repository():
     try:
-        subprocess.check_output(['git', 'rev-parse', '--is-inside-work-tree'])
+        subprocess.check_output(["git", "rev-parse", "--is-inside-work-tree"])
         return True
     except subprocess.CalledProcessError:
         return False
 
+
+# Process the code string to match "`" pairs and apply capitalization
 def process_code_string(title: str, ignored_words: set = None, capitalize_mode: str = "first") -> str:
     if ignored_words is None:
         ignored_words = IGNORED_WORDS
@@ -134,7 +152,7 @@ def process_code_string(title: str, ignored_words: set = None, capitalize_mode: 
     return " ".join(processed_words)
 
 
-# Function to get directories and files in the current path
+# Get directories and files in the current path
 def get_directories_and_files(path):
     try:
         # List directories first, then files
@@ -143,7 +161,7 @@ def get_directories_and_files(path):
         return []
 
 
-# Recursive function to show the menu
+# Recursive function to show the file selection menu
 def show_menu(stdscr, y, x, base_path, current_path, depth=0):
     # Get directories and files for the current path
     entries = get_directories_and_files(current_path)
@@ -153,7 +171,6 @@ def show_menu(stdscr, y, x, base_path, current_path, depth=0):
     color_pair_selected = curses.color_pair(4) | curses.A_BOLD  # Bold text for selected item
 
     while True:
-        # Display menu items at the current depth
         # Display menu items at the current depth
         for idx, entry in enumerate(entries):
             if idx == current_selection:
@@ -209,11 +226,51 @@ def show_menu(stdscr, y, x, base_path, current_path, depth=0):
                 return
 
 
-# Function to insert the selected path into the input string
+# Insert the selected path into the input string
 def insert_selected_path(input_str, selected_path, cursor_x, prompt_length):
     return (input_str[: cursor_x - prompt_length] + "`" + selected_path + "`" + " " + input_str[cursor_x - prompt_length :]), cursor_x + len(selected_path) + 3
 
-def get_input(stdscr, y, prompt, color_pair):
+# Menu to prompt the user to select an commit type with emojis
+def custom_menu(stdscr, menu_title, menu_items, y=1):
+    curses.curs_set(0)  # Hide cursor
+    current_selection = 0
+    color_pair_selected = curses.color_pair(4) | curses.A_BOLD
+    color_pair_normal = curses.color_pair(5)
+
+    while True:
+        # stdscr.clear()
+        # Display menu title on the y line
+        stdscr.addstr(y, 0, menu_title)
+
+        for idx, entry in enumerate(menu_items):
+            if idx == current_selection:
+                stdscr.attron(color_pair_selected)
+            else:
+                stdscr.attron(color_pair_normal)
+            # Display each menu item below the title
+            stdscr.addstr(y + idx + 1, 0, entry)  # +1 to account for the title line
+            stdscr.attroff(color_pair_selected)
+            stdscr.attroff(color_pair_normal)
+
+        key = stdscr.getch()
+        if key == curses.KEY_UP and current_selection > 0:
+            current_selection -= 1
+        elif key == curses.KEY_DOWN and current_selection < len(menu_items) - 1:
+            current_selection += 1
+        elif key in [curses.KEY_ENTER, ord('\n')]:
+            # Clear the menu display area
+            for i in range(len(menu_items) + 1):  # +1 to include the title line
+                stdscr.move(y + i, 0)
+                stdscr.clrtoeol()
+            stdscr.refresh()
+            break  # User made a selection
+
+        stdscr.refresh()
+
+    return menu_items[current_selection]
+
+# Get input from the user
+def get_input(stdscr, y, prompt, color_pair, emoji=False):
     stdscr.move(y, 0)  # Move to the new line for each prompt
     stdscr.clrtoeol()  # Clear the line
     stdscr.attron(color_pair)
@@ -222,8 +279,23 @@ def get_input(stdscr, y, prompt, color_pair):
     stdscr.refresh()
 
     input_str = ""
-    cursor_x = len(prompt)
+    if emoji:
+        commit_type = custom_menu(stdscr, "Select Commit Type: ", EMOJIS)
+        
+        # Append the commit type to the input string
+        input_str = commit_type + " " + input_str
 
+        # Update the cursor position to the end of the updated input string
+        cursor_x = len(input_str) + len(prompt) + 1
+
+        # Display the prompt and the updated input string
+        stdscr.attron(color_pair)
+        stdscr.addstr(y, len(prompt), input_str)
+        stdscr.attroff(color_pair)
+    else:
+        cursor_x = len(prompt)
+    # Show the cursor
+    curses.curs_set(1)
     while True:
         key = stdscr.getch()
         if key in [curses.KEY_BACKSPACE, 127, 8]:  # Handle backspace for different terminals
@@ -257,6 +329,8 @@ def get_input(stdscr, y, prompt, color_pair):
 
     return input_str.strip()
 
+
+# Run a git command and display the output
 def run_git_command(stdscr, command):
     try:
         # Run the Git command
@@ -264,12 +338,14 @@ def run_git_command(stdscr, command):
         # Display the success message along with any output from the command
         stdscr.attron(curses.color_pair(2))  # Assuming color_pair(2) is for success messages
         if result.stdout:
-            stdscr.addstr("\nOutput:\n" + result.stdout)
+            stdscr.addstr(result.stdout)
+        if result.stderr:
+            stdscr.addstr(result.stderr)
         stdscr.attroff(curses.color_pair(2))
         stdscr.refresh()
         # stdscr.getch()
         return True
-        
+
     except subprocess.CalledProcessError as e:
         # Handle errors specifically from the subprocess
         stdscr.attron(curses.color_pair(3))  # Assuming color_pair(3) is for error messages
@@ -289,6 +365,8 @@ def run_git_command(stdscr, command):
         # stdscr.getch()
         return False
 
+
+# The main function
 def main(stdscr, prompts, confirmations):
     # check if the current directory is a git repository
     if not is_git_repository():
@@ -297,9 +375,9 @@ def main(stdscr, prompts, confirmations):
     curses.use_default_colors()
     if curses.has_colors():
         curses.start_color()
-        curses.init_pair(1, 3, 8) # Yellow
-        curses.init_pair(2, 2, 8) # Green
-        curses.init_pair(3, 1, 8) # Red
+        curses.init_pair(1, 3, 8)  # Yellow
+        curses.init_pair(2, 2, 8)  # Green
+        curses.init_pair(3, 1, 8)  # Red
         curses.init_pair(4, 9, 8)
         curses.init_pair(5, -1, 8)
         color_pair = curses.color_pair(1)
@@ -310,7 +388,7 @@ def main(stdscr, prompts, confirmations):
     responses = []
     y = 0  # Start at the top of the screen
     for prompt in prompts:
-        response = get_input(stdscr, y, prompt, color_pair)
+        response = get_input(stdscr, y, prompt, color_pair, True if y == 0 else False)
         if response == "":
             response = "-"
         responses.append(response)
@@ -321,13 +399,13 @@ def main(stdscr, prompts, confirmations):
     responses[0] = process_code_string(responses[0], capitalize_mode="all")
     responses[1] = process_code_string(responses[1])
     for i, response in enumerate(responses):
-    # Apply green color to the prompt
+        # Apply green color to the prompt
         stdscr.attron(curses.color_pair(2))
         stdscr.addstr(i + y, 0, confirmations[i])
         stdscr.attroff(curses.color_pair(2))
 
         # Print the response in the default color
-        stdscr.addstr(response + '\n')
+        stdscr.addstr(response + "\n")
     # Check if user wants to commit the changes
     stdscr.attron(curses.color_pair(3))
     stdscr.addstr("Commit these changes? (y/n): ")
@@ -335,7 +413,7 @@ def main(stdscr, prompts, confirmations):
     stdscr.refresh()
 
     commit_key = stdscr.getch()
-    if commit_key in [ord('y'), ord('Y')]:
+    if commit_key in [ord("y"), ord("Y")]:
         # Add all files to the staging area
         add_command = ["git", "add", "."]
         result = run_git_command(stdscr, add_command)
@@ -360,7 +438,7 @@ def main(stdscr, prompts, confirmations):
         stdscr.refresh()
 
         push_key = stdscr.getch()
-        if push_key in [ord('y'), ord('Y')]:
+        if push_key in [ord("y"), ord("Y")]:
             # User wants to push
             # Run the git push command
             push_command = ["git", "push"]
