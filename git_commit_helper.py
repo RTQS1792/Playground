@@ -2,7 +2,7 @@
 Author       : Hanqing Qi
 Date         : 2023-11-10 15:15:52
 LastEditors  : Hanqing Qi
-LastEditTime : 2023-11-10 17:07:06
+LastEditTime : 2023-11-10 17:14:21
 FilePath     : /Playground/git_commit_helper.py
 Description  : 
 """
@@ -423,6 +423,7 @@ def main(stdscr, prompts, confirmations):
     stdscr.attroff(curses.color_pair(5))
     stdscr.refresh()
 
+    terminated = False
     while True:
         commit_key = stdscr.getch()
         if commit_key in [ord("y"), ord("Y")]:
@@ -450,6 +451,7 @@ def main(stdscr, prompts, confirmations):
             stdscr.refresh()
 
             while True:
+                terminated = True
                 push_key = stdscr.getch()
                 if push_key in [ord("y"), ord("Y")]:
                     # User wants to push
@@ -462,13 +464,13 @@ def main(stdscr, prompts, confirmations):
                     stdscr.attron(curses.color_pair(2))
                     stdscr.addstr("\nChanges pushed successfully.")
                     stdscr.attroff(curses.color_pair(2))
-                    return
+                    break
                 elif push_key in [ord("n"), ord("N")]:
                     # User does not want to commit
                     stdscr.attron(curses.color_pair(3))
                     stdscr.addstr("\nOperation cancelled by the user.")
                     stdscr.attroff(curses.color_pair(3))
-                    return
+                    break
                 else:
                     # Invalid key
                     continue
@@ -480,6 +482,8 @@ def main(stdscr, prompts, confirmations):
             break
         else:
             # Invalid key
+            if terminated and commit_key in [10, 13]:
+                break
             continue
 
     stdscr.refresh()
