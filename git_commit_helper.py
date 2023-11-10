@@ -1,3 +1,11 @@
+"""
+Author       : Hanqing Qi
+Date         : 2023-11-10 15:15:52
+LastEditors  : Hanqing Qi
+LastEditTime : 2023-11-10 15:49:57
+FilePath     : /Playground/git_commit_helper.py
+Description  : 
+"""
 # -*- coding: utf-8 -*-
 
 import subprocess
@@ -55,7 +63,7 @@ IGNORED_WORDS = {
 
 EMOJIS = [
     "📝 Add Documentation",
-    "📥 Added",
+    "📥 Add",
     "🔨 Fix",
     "💨 Hotfix",
     "🔎 Need Testing",
@@ -280,6 +288,7 @@ def custom_menu(stdscr, menu_title, menu_items, y=1):
 # Get input from the user
 def get_input(stdscr, y, prompt, color_pair, emoji=False):
     stdscr.move(y, 0)  # Move to the new line for each prompt
+    max_y, max_x = stdscr.getmaxyx()  # Get window dimensions
     stdscr.clrtoeol()  # Clear the line
     stdscr.attron(color_pair)
     stdscr.addstr(prompt)
@@ -289,17 +298,9 @@ def get_input(stdscr, y, prompt, color_pair, emoji=False):
     input_str = ""
     if emoji:
         commit_type = custom_menu(stdscr, "Select Commit Type: ", EMOJIS)
-
-        # Append the commit type to the input string
         input_str = commit_type + " " + input_str
-
-        # Update the cursor position to the end of the updated input string
         cursor_x = len(input_str) + len(prompt) + 1
-
-        # Display the prompt and the updated input string
-        stdscr.attron(color_pair)
         stdscr.addstr(y, len(prompt), input_str)
-        stdscr.attroff(color_pair)
     else:
         cursor_x = len(prompt)
     # Show the cursor
@@ -325,6 +326,14 @@ def get_input(stdscr, y, prompt, color_pair, emoji=False):
                 input_str, cursor_x = insert_selected_path(input_str, selected_option, cursor_x, len(prompt))
         elif key == 10:  # Enter key
             break
+        # # Handle cursor wrapping
+        # if cursor_x > line_width:
+        #     cursor_x = prompt_length
+        #     cursor_y += 1
+        # elif cursor_x < prompt_length and cursor_y > y:
+        #     cursor_y -= 1
+        #     cursor_x = line_width
+
 
         stdscr.move(y, 0)  # Move to the start of the prompt
         stdscr.clrtoeol()  # Clear the line from the current position
@@ -416,9 +425,9 @@ def main(stdscr, prompts, confirmations):
         # Print the response in the default color
         stdscr.addstr(response + "\n")
     # Check if user wants to commit the changes
-    stdscr.attron(curses.color_pair(3))
+    stdscr.attron(curses.color_pair(5))
     stdscr.addstr("Commit these changes? (y/n): ")
-    stdscr.attroff(curses.color_pair(3))
+    stdscr.attroff(curses.color_pair(5))
     stdscr.refresh()
 
     commit_key = stdscr.getch()
@@ -441,9 +450,9 @@ def main(stdscr, prompts, confirmations):
         stdscr.refresh()
 
         # Now ask for push
-        stdscr.attron(curses.color_pair(3))
+        stdscr.attron(curses.color_pair(5))
         stdscr.addstr("\nPush the committed changes? (y/n): ")
-        stdscr.attroff(curses.color_pair(3))
+        stdscr.attroff(curses.color_pair(5))
         stdscr.refresh()
 
         push_key = stdscr.getch()
@@ -474,8 +483,8 @@ def main(stdscr, prompts, confirmations):
 
 
 try:
-    prompts = ["Enter Commit Title: ", "Enter Commit Message: "]
-    confirmations = ["Commit Title: ", "Commit Message: "]
+    prompts = ["Enter commit title: ", "Enter commit message: "]
+    confirmations = ["Commit title: ", "Commit message: "]
     curses.wrapper(main, prompts, confirmations)
 except KeyboardInterrupt:
     print("\033[31m" + "\nOperation cancelled by the user." + "\033[0m")
