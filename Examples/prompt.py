@@ -1,3 +1,11 @@
+"""
+Author       : Hanqing Qi
+Date         : 2023-11-10 15:15:52
+LastEditors  : Hanqing Qi
+LastEditTime : 2023-11-10 15:56:06
+FilePath     : /Playground/Examples/prompt.py
+Description  : 
+"""
 # -*- coding: utf-8 -*-
 
 import subprocess
@@ -55,7 +63,7 @@ IGNORED_WORDS = {
 
 EMOJIS = [
     "📝 Add Documentation",
-    "📥 Added",
+    "📥 Add",
     "🔨 Fix",
     "💨 Hotfix",
     "🔎 Need Testing",
@@ -280,6 +288,7 @@ def custom_menu(stdscr, menu_title, menu_items, y=1):
 # Get input from the user
 def get_input(stdscr, y, prompt, color_pair, emoji=False):
     stdscr.move(y, 0)  # Move to the new line for each prompt
+    max_y, max_x = stdscr.getmaxyx()  # Get window dimensions
     stdscr.clrtoeol()  # Clear the line
     stdscr.attron(color_pair)
     stdscr.addstr(prompt)
@@ -289,34 +298,46 @@ def get_input(stdscr, y, prompt, color_pair, emoji=False):
     input_str = ""
     if emoji:
         commit_type = custom_menu(stdscr, "Select Commit Type: ", EMOJIS)
-
-        # Append the commit type to the input string
         input_str = commit_type + " " + input_str
-
-        # Update the cursor position to the end of the updated input string
         cursor_x = len(input_str) + len(prompt) + 1
-
-        # Display the prompt and the updated input string
-        stdscr.attron(color_pair)
         stdscr.addstr(y, len(prompt), input_str)
-        stdscr.attroff(color_pair)
     else:
         cursor_x = len(prompt)
-    # Show the cursor
-    curses.curs_set(1)
+
+    cursor_y = y  # Initialize the cursor's Y position
+    prompt_length = len(prompt)
+    line_width = max_x - prompt_length  # Width available for input
+
+    curses.curs_set(1)  # Show the cursor
     while True:
         key = stdscr.getch()
-        if key in [curses.KEY_BACKSPACE, 127, 8]:  # Handle backspace for different terminals
-            input_str = input_str[:-1]
-            cursor_x = max(len(prompt), cursor_x - 1)
+        if key in [curses.KEY_BACKSPACE, 127, 8]:  # Handle backspace
+            if cursor_x > prompt_length or cursor_y > y:
+                if cursor_x == prompt_length and cursor_y > y:
+                    cursor_y -= 1
+                    cursor_x = line_width + prompt_length
+                input_str = input_str[:cursor_x - prompt_length - 1 + (cursor_y - y) * line_width] + input_str[cursor_x - prompt_length + (cursor_y - y) * line_width:]
+                cursor_x -= 1
         elif key == curses.KEY_LEFT:
-            cursor_x = max(len(prompt), cursor_x - 1)
+            if cursor_x > prompt_length or cursor_y > y:
+                cursor_x -= 1
+                if cursor_x < prompt_length and cursor_y > y:
+                    cursor_y -= 1
+                    cursor_x = line_width + prompt_length
         elif key == curses.KEY_RIGHT:
-            cursor_x = min(len(prompt) + len(input_str), cursor_x + 1)
-        elif 32 <= key <= 126:
+            if cursor_x < line_width + prompt_length or cursor_y < y + len(input_str) // line_width:
+                cursor_x += 1
+                if cursor_x > line_width + prompt_length:
+                    cursor_x = prompt_length
+                    cursor_y += 1
+        elif 32 <= key <= 126:  # Regular character input
             char = chr(key)
-            input_str = input_str[: cursor_x - len(prompt)] + char + input_str[cursor_x - len(prompt) :]
+            index = cursor_x - prompt_length + (cursor_y - y) * line_width
+            input_str = input_str[:index] + char + input_str[index:]
             cursor_x += 1
+            if cursor_x > line_width + prompt_length:
+                cursor_x = prompt_length
+                cursor_y += 1
         elif key == curses.KEY_DOWN:
             # Open the menu at the current directory
             base_path = os.getcwd()  # Store the base path
@@ -326,17 +347,20 @@ def get_input(stdscr, y, prompt, color_pair, emoji=False):
         elif key == 10:  # Enter key
             break
 
-        stdscr.move(y, 0)  # Move to the start of the prompt
-        stdscr.clrtoeol()  # Clear the line from the current position
-        stdscr.attron(color_pair)
-        stdscr.addstr(prompt)
-        stdscr.attroff(color_pair)
-        stdscr.addstr(input_str)
-        stdscr.move(y, cursor_x)  # Move the cursor to the correct position
+        # Refresh the input display with line wrapping
+        for i in range(cursor_y - y + 1):
+            stdscr.move(y + i, 0)
+            stdscr.clrtoeol()
+            display_text = input_str[i * line_width: (i + 1) * line_width]
+            stdscr.attron(color_pair)
+            stdscr.addstr(y + i, 0, prompt if i == 0 else "")
+            stdscr.attroff(color_pair)
+            stdscr.addstr(y + i, prompt_length if i == 0 else 0, display_text)
+
+        stdscr.move(cursor_y, cursor_x)  # Move the cursor to the correct position
         stdscr.refresh()
 
     return input_str.strip()
-
 
 # Run a git command and display the output
 def run_git_command(stdscr, command):
@@ -416,9 +440,9 @@ def main(stdscr, prompts, confirmations):
         # Print the response in the default color
         stdscr.addstr(response + "\n")
     # Check if user wants to commit the changes
-    stdscr.attron(curses.color_pair(3))
+    stdscr.attron(curses.color_pair(5))
     stdscr.addstr("Commit these changes? (y/n): ")
-    stdscr.attroff(curses.color_pair(3))
+    stdscr.attroff(curses.color_pair(5))
     stdscr.refresh()
 
     commit_key = stdscr.getch()
@@ -441,9 +465,9 @@ def main(stdscr, prompts, confirmations):
         stdscr.refresh()
 
         # Now ask for push
-        stdscr.attron(curses.color_pair(3))
+        stdscr.attron(curses.color_pair(5))
         stdscr.addstr("\nPush the committed changes? (y/n): ")
-        stdscr.attroff(curses.color_pair(3))
+        stdscr.attroff(curses.color_pair(5))
         stdscr.refresh()
 
         push_key = stdscr.getch()
@@ -474,8 +498,8 @@ def main(stdscr, prompts, confirmations):
 
 
 try:
-    prompts = ["Enter Commit Title: ", "Enter Commit Message: "]
-    confirmations = ["Commit Title: ", "Commit Message: "]
+    prompts = ["Enter commit title: ", "Enter commit message: "]
+    confirmations = ["Commit title: ", "Commit message: "]
     curses.wrapper(main, prompts, confirmations)
 except KeyboardInterrupt:
     print("\033[31m" + "\nOperation cancelled by the user." + "\033[0m")

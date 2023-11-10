@@ -2,7 +2,7 @@
 Author       : Hanqing Qi
 Date         : 2023-11-10 15:15:52
 LastEditors  : Hanqing Qi
-LastEditTime : 2023-11-10 15:49:57
+LastEditTime : 2023-11-10 16:35:24
 FilePath     : /Playground/git_commit_helper.py
 Description  : 
 """
@@ -299,7 +299,7 @@ def get_input(stdscr, y, prompt, color_pair, emoji=False):
     if emoji:
         commit_type = custom_menu(stdscr, "Select Commit Type: ", EMOJIS)
         input_str = commit_type + " " + input_str
-        cursor_x = len(input_str) + len(prompt) + 1
+        cursor_x = len(input_str) + len(prompt)
         stdscr.addstr(y, len(prompt), input_str)
     else:
         cursor_x = len(prompt)
@@ -308,15 +308,16 @@ def get_input(stdscr, y, prompt, color_pair, emoji=False):
     while True:
         key = stdscr.getch()
         if key in [curses.KEY_BACKSPACE, 127, 8]:  # Handle backspace for different terminals
-            input_str = input_str[:-1]
-            cursor_x = max(len(prompt), cursor_x - 1)
+            # Delete a character at the cursor position and move cursor left
+            input_str = input_str[: cursor_x - len(prompt) - 1] + input_str[cursor_x - len(prompt):]
+            cursor_x -= 1
         elif key == curses.KEY_LEFT:
             cursor_x = max(len(prompt), cursor_x - 1)
         elif key == curses.KEY_RIGHT:
             cursor_x = min(len(prompt) + len(input_str), cursor_x + 1)
         elif 32 <= key <= 126:
             char = chr(key)
-            input_str = input_str[: cursor_x - len(prompt)] + char + input_str[cursor_x - len(prompt) :]
+            input_str = input_str[: cursor_x - len(prompt)] + char + input_str[cursor_x - len(prompt):]
             cursor_x += 1
         elif key == curses.KEY_DOWN:
             # Open the menu at the current directory
@@ -326,14 +327,6 @@ def get_input(stdscr, y, prompt, color_pair, emoji=False):
                 input_str, cursor_x = insert_selected_path(input_str, selected_option, cursor_x, len(prompt))
         elif key == 10:  # Enter key
             break
-        # # Handle cursor wrapping
-        # if cursor_x > line_width:
-        #     cursor_x = prompt_length
-        #     cursor_y += 1
-        # elif cursor_x < prompt_length and cursor_y > y:
-        #     cursor_y -= 1
-        #     cursor_x = line_width
-
 
         stdscr.move(y, 0)  # Move to the start of the prompt
         stdscr.clrtoeol()  # Clear the line from the current position
@@ -341,7 +334,7 @@ def get_input(stdscr, y, prompt, color_pair, emoji=False):
         stdscr.addstr(prompt)
         stdscr.attroff(color_pair)
         stdscr.addstr(input_str)
-        stdscr.move(y, cursor_x)  # Move the cursor to the correct position
+        stdscr.move(y, cursor_x + 1 if emoji else cursor_x)  # Move the cursor to the correct position with emoji offset
         stdscr.refresh()
 
     return input_str.strip()
