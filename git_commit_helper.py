@@ -2,7 +2,7 @@
 Author       : Hanqing Qi
 Date         : 2023-11-10 15:15:52
 LastEditors  : Hanqing Qi
-LastEditTime : 2023-11-10 16:35:24
+LastEditTime : 2023-11-10 17:07:06
 FilePath     : /Playground/git_commit_helper.py
 Description  : 
 """
@@ -423,53 +423,64 @@ def main(stdscr, prompts, confirmations):
     stdscr.attroff(curses.color_pair(5))
     stdscr.refresh()
 
-    commit_key = stdscr.getch()
-    if commit_key in [ord("y"), ord("Y")]:
-        # Add all files to the staging area
-        add_command = ["git", "add", "."]
-        result = run_git_command(stdscr, add_command)
-        # result = True
-        if not result:
-            return
-        # Run the git commit command
-        commit_command = ["git", "commit", "-m", responses[0], "-m", responses[1]]
-        result = run_git_command(stdscr, commit_command)
-        # result = True
-        if not result:
-            return
-        stdscr.attron(curses.color_pair(2))
-        stdscr.addstr("\nChanges committed successfully.")
-        stdscr.attroff(curses.color_pair(2))
-        stdscr.refresh()
-
-        # Now ask for push
-        stdscr.attron(curses.color_pair(5))
-        stdscr.addstr("\nPush the committed changes? (y/n): ")
-        stdscr.attroff(curses.color_pair(5))
-        stdscr.refresh()
-
-        push_key = stdscr.getch()
-        if push_key in [ord("y"), ord("Y")]:
-            # User wants to push
-            # Run the git push command
-            push_command = ["git", "push"]
-            result = run_git_command(stdscr, push_command)
+    while True:
+        commit_key = stdscr.getch()
+        if commit_key in [ord("y"), ord("Y")]:
+            # Add all files to the staging area
+            add_command = ["git", "add", "."]
+            result = run_git_command(stdscr, add_command)
+            # result = True
+            if not result:
+                return
+            # Run the git commit command
+            commit_command = ["git", "commit", "-m", responses[0], "-m", responses[1]]
+            result = run_git_command(stdscr, commit_command)
             # result = True
             if not result:
                 return
             stdscr.attron(curses.color_pair(2))
-            stdscr.addstr("\nChanges pushed successfully.")
+            stdscr.addstr("\nChanges committed successfully.")
             stdscr.attroff(curses.color_pair(2))
-        else:
+            stdscr.refresh()
+
+            # Now ask for push
+            stdscr.attron(curses.color_pair(5))
+            stdscr.addstr("\nPush the committed changes? (y/n): ")
+            stdscr.attroff(curses.color_pair(5))
+            stdscr.refresh()
+
+            while True:
+                push_key = stdscr.getch()
+                if push_key in [ord("y"), ord("Y")]:
+                    # User wants to push
+                    # Run the git push command
+                    push_command = ["git", "push"]
+                    result = run_git_command(stdscr, push_command)
+                    # result = True
+                    if not result:
+                        return
+                    stdscr.attron(curses.color_pair(2))
+                    stdscr.addstr("\nChanges pushed successfully.")
+                    stdscr.attroff(curses.color_pair(2))
+                    return
+                elif push_key in [ord("n"), ord("N")]:
+                    # User does not want to commit
+                    stdscr.attron(curses.color_pair(3))
+                    stdscr.addstr("\nOperation cancelled by the user.")
+                    stdscr.attroff(curses.color_pair(3))
+                    return
+                else:
+                    # Invalid key
+                    continue
+        elif commit_key in [ord("n"), ord("N")]:
             # User does not want to commit
             stdscr.attron(curses.color_pair(3))
             stdscr.addstr("\nOperation cancelled by the user.")
             stdscr.attroff(curses.color_pair(3))
-    else:
-        # User does not want to commit
-        stdscr.attron(curses.color_pair(3))
-        stdscr.addstr("\nOperation cancelled by the user.")
-        stdscr.attroff(curses.color_pair(3))
+            break
+        else:
+            # Invalid key
+            continue
 
     stdscr.refresh()
     stdscr.getch()
