@@ -267,7 +267,7 @@ def run_git_command(stdscr, command):
             stdscr.addstr("\nOutput:\n" + result.stdout)
         stdscr.attroff(curses.color_pair(2))
         stdscr.refresh()
-        stdscr.getch()
+        # stdscr.getch()
         return True
         
     except subprocess.CalledProcessError as e:
@@ -277,7 +277,7 @@ def run_git_command(stdscr, command):
         stdscr.addstr("Error - " + str(e.stderr))
         stdscr.attroff(curses.color_pair(3))
         stdscr.refresh()
-        stdscr.getch()
+        # stdscr.getch()
         return False
     except Exception as e:
         # Handle other exceptions
@@ -286,7 +286,7 @@ def run_git_command(stdscr, command):
         stdscr.addstr(str(e))
         stdscr.attroff(curses.color_pair(3))
         stdscr.refresh()
-        stdscr.getch()
+        # stdscr.getch()
         return False
 
 def main(stdscr, prompts, confirmations):
@@ -336,15 +336,16 @@ def main(stdscr, prompts, confirmations):
 
     commit_key = stdscr.getch()
     if commit_key in [ord('y'), ord('Y')]:
-        # User wants to commit
         # Add all files to the staging area
         add_command = ["git", "add", "."]
         result = run_git_command(stdscr, add_command)
+        # result = True
         if not result:
             return
         # Run the git commit command
         commit_command = ["git", "commit", "-m", responses[0], "-m", responses[1]]
         result = run_git_command(stdscr, commit_command)
+        # result = True
         if not result:
             return
         stdscr.attron(curses.color_pair(2))
@@ -364,6 +365,7 @@ def main(stdscr, prompts, confirmations):
             # Run the git push command
             push_command = ["git", "push"]
             result = run_git_command(stdscr, push_command)
+            # result = True
             if not result:
                 return
             stdscr.attron(curses.color_pair(2))
