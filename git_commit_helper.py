@@ -2,8 +2,8 @@
 Author       : Hanqing Qi
 Date         : 2023-11-10 15:15:52
 LastEditors  : Hanqing Qi
-LastEditTime : 2023-11-10 17:14:21
-FilePath     : /Playground/git_commit_helper.py
+LastEditTime : 2023-11-14 16:27:11
+FilePath     : /Bluetooth/Users/hanqingqi/Library/CloudStorage/Dropbox/Playground/git_commit_helper.py
 Description  : 
 """
 # -*- coding: utf-8 -*-
@@ -12,7 +12,7 @@ import subprocess
 import curses
 import re
 import os
-import locale
+import emoji
 
 IGNORED_WORDS = {
     "and",
@@ -67,12 +67,14 @@ EMOJIS = [
     "🔨 Fix",
     "💨 Hotfix",
     "🔎 Need Testing",
-    "🍻 Pass",
+    "🍻 Pass Test",
     "📖 Readme",
     "🔥 Remove",
     "🎉 Start",
     "💾 Save",
     "🔧 Update",
+    "🎲 Pass Unit Test",
+    "🚧 Work in Progress",
     "🏗️",
 ]
 
@@ -305,11 +307,12 @@ def get_input(stdscr, y, prompt, color_pair, emoji=False):
         cursor_x = len(prompt)
     # Show the cursor
     curses.curs_set(1)
+    new_y = y
     while True:
         key = stdscr.getch()
         if key in [curses.KEY_BACKSPACE, 127, 8]:  # Handle backspace for different terminals
             # Delete a character at the cursor position and move cursor left
-            input_str = input_str[: cursor_x - len(prompt) - 1] + input_str[cursor_x - len(prompt):]
+            input_str = input_str[: cursor_x - len(prompt) - 1] + input_str[cursor_x - len(prompt) :]
             cursor_x -= 1
         elif key == curses.KEY_LEFT:
             cursor_x = max(len(prompt), cursor_x - 1)
@@ -317,27 +320,42 @@ def get_input(stdscr, y, prompt, color_pair, emoji=False):
             cursor_x = min(len(prompt) + len(input_str), cursor_x + 1)
         elif 32 <= key <= 126:
             char = chr(key)
-            input_str = input_str[: cursor_x - len(prompt)] + char + input_str[cursor_x - len(prompt):]
+            input_str = input_str[: cursor_x - len(prompt)] + char + input_str[cursor_x - len(prompt) :]
             cursor_x += 1
         elif key == curses.KEY_DOWN:
             # Open the menu at the current directory
             base_path = os.getcwd()  # Store the base path
-            selected_option = show_menu(stdscr, y + 1, 0, base_path, base_path)
+            selected_option = show_menu(stdscr, new_y + 1, 0, base_path, base_path)
             if selected_option:
                 input_str, cursor_x = insert_selected_path(input_str, selected_option, cursor_x, len(prompt))
         elif key == 10:  # Enter key
             break
 
+        for i in range(y, new_y + 1):
+            stdscr.move(i, 0)  # Move to the start of each line
+            stdscr.clrtoeol()  # Clear the line from the current position
         stdscr.move(y, 0)  # Move to the start of the prompt
-        stdscr.clrtoeol()  # Clear the line from the current position
         stdscr.attron(color_pair)
         stdscr.addstr(prompt)
         stdscr.attroff(color_pair)
         stdscr.addstr(input_str)
-        stdscr.move(y, cursor_x + 1 if emoji else cursor_x)  # Move the cursor to the correct position with emoji offset
-        stdscr.refresh()
-
-    return input_str.strip()
+        cursor_diff = cursor_x + 1 - max_x if emoji else cursor_x - max_x
+        if cursor_diff >= 2*max_x:
+            new_y = y + 3
+            stdscr.move(new_y, cursor_diff - 2*max_x)
+        elif cursor_diff >= max_x:
+            new_y = y + 2
+            stdscr.move(new_y, cursor_diff - max_x)
+        elif cursor_diff >= 0:
+            new_y = y + 1
+            stdscr.move(new_y, cursor_diff)
+        else:
+            stdscr.move(y, cursor_x + 1 if emoji else cursor_x)  # Move the cursor to the correct position with emoji offset
+        # try:
+        #     stdscr.move(y, cursor_x + 1 if emoji else cursor_x)  # Move the cursor to the correct position with emoji offset
+        # except curses.error:
+        #     stdscr.move(y + 1, cursor_x + 1 - max_x if emoji else cursor_x - max_x)
+    return input_str.strip(), new_y
 
 
 # Run a git command and display the output
@@ -346,12 +364,15 @@ def run_git_command(stdscr, command):
         # Run the Git command
         result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         # Display the success message along with any output from the command
-        stdscr.attron(curses.color_pair(2))  # Assuming color_pair(2) is for success messages
+        # stdscr.attron(curses.color_pair(2))  # Assuming color_pair(2) is for success messages
+        curses.use_default_colors()
         if result.stdout:
+            stdscr.move(stdscr.getyx()[0] + 1, 0)
             stdscr.addstr(result.stdout)
         if result.stderr:
+            stdscr.move(stdscr.getyx()[0] + 1, 0)
             stdscr.addstr(result.stderr)
-        stdscr.attroff(curses.color_pair(2))
+        # stdscr.attroff(curses.color_pair(2))
         stdscr.refresh()
         # stdscr.getch()
         return True
@@ -359,6 +380,7 @@ def run_git_command(stdscr, command):
     except subprocess.CalledProcessError as e:
         # Handle errors specifically from the subprocess
         stdscr.attron(curses.color_pair(3))  # Assuming color_pair(3) is for error messages
+        stdscr.move(stdscr.getyx()[0] + 1, 0)
         stdscr.addstr("\nGit command failed: ")
         stdscr.addstr("Error - " + str(e.stderr))
         stdscr.attroff(curses.color_pair(3))
@@ -368,6 +390,7 @@ def run_git_command(stdscr, command):
     except Exception as e:
         # Handle other exceptions
         stdscr.attron(curses.color_pair(3))  # Assuming color_pair(3) is for error messages
+        stdscr.move(stdscr.getyx()[0] + 1, 0)
         stdscr.addstr("\nUnexpected error occurred:")
         stdscr.addstr(str(e))
         stdscr.attroff(curses.color_pair(3))
@@ -399,11 +422,11 @@ def main(stdscr, prompts, confirmations):
     responses = []
     y = 0  # Start at the top of the screen
     for prompt in prompts:
-        response = get_input(stdscr, y, prompt, color_pair, True if y == 0 else False)
+        response, new_y = get_input(stdscr, y, prompt, color_pair, True if y == 0 else False)
         if response == "":
             response = "-"
         responses.append(response)
-        y += 1  # Move to the next line for the next prompt
+        y += (new_y + 1)  # Move to the next line for the next prompt
 
     # Optionally, display all the entered texts after the inputs
     # stdscr.clear()
@@ -482,18 +505,18 @@ def main(stdscr, prompts, confirmations):
             break
         else:
             # Invalid key
-            if terminated and commit_key in [10, 13]:
+            if terminated and (commit_key in [10, 13] or commit_key == curses.KEY_ENTER):
                 break
             continue
 
     stdscr.refresh()
-    stdscr.getch()
 
 
 try:
     prompts = ["Enter commit title: ", "Enter commit message: "]
     confirmations = ["Commit title: ", "Commit message: "]
     curses.wrapper(main, prompts, confirmations)
+    print("\033[32m" + "\nSuccess." + "\033[0m")
 except KeyboardInterrupt:
     print("\033[31m" + "\nOperation cancelled by the user." + "\033[0m")
 except Exception as e:
