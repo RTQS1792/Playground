@@ -2,8 +2,8 @@
 Author       : Hanqing Qi
 Date         : 2023-11-10 15:15:52
 LastEditors  : Hanqing Qi
-LastEditTime : 2023-11-14 16:27:11
-FilePath     : /Bluetooth/Users/hanqingqi/Library/CloudStorage/Dropbox/Playground/git_commit_helper.py
+LastEditTime : 2023-11-16 12:26:51
+FilePath     : /Playground/git_commit_helper.py
 Description  : 
 """
 # -*- coding: utf-8 -*-
@@ -86,6 +86,7 @@ def is_git_repository():
         return True
     except subprocess.CalledProcessError:
         return False
+        
 #helper functions
 def process_word_in_backtick(word, processing_words, tick_open, ext_regex):
     if re.search(ext_regex, word):
@@ -308,7 +309,7 @@ def get_input(stdscr, y, prompt, color_pair, emoji=False):
         cursor_x = len(prompt)
     # Show the cursor
     curses.curs_set(1)
-    new_y = y
+    cursor_line = y
     while True:
         key = stdscr.getch()
         if key in [curses.KEY_BACKSPACE, 127, 8]:  # Handle backspace for different terminals
@@ -326,37 +327,41 @@ def get_input(stdscr, y, prompt, color_pair, emoji=False):
         elif key == curses.KEY_DOWN:
             # Open the menu at the current directory
             base_path = os.getcwd()  # Store the base path
-            selected_option = show_menu(stdscr, new_y + 1, 0, base_path, base_path)
+            selected_option = show_menu(stdscr, cursor_line + 1, 0, base_path, base_path)
             if selected_option:
                 input_str, cursor_x = insert_selected_path(input_str, selected_option, cursor_x, len(prompt))
         elif key == 10:  # Enter key
             break
 
-        for i in range(y, new_y + 1):
-            stdscr.move(i, 0)  # Move to the start of each line
-            stdscr.clrtoeol()  # Clear the line from the current position
-        stdscr.move(y, 0)  # Move to the start of the prompt
+        # Improved Cursor Position Calculation and Movement
+        cursor_line_offset = (cursor_x + (1 if emoji else 0)) // max_x  # Calculate how many lines the cursor has moved down
+        cursor_line = y + cursor_line_offset  # Calculate the new cursor line
+        cursor_column = (cursor_x + (1 if emoji else 0)) % max_x  # Calculate the cursor's column
+
+        # Clear necessary lines
+        for i in range(y, cursor_line + 1):
+            stdscr.move(i, 0)
+            stdscr.clrtoeol()
+
+        # Redraw prompt and input
+        stdscr.move(y, 0)
         stdscr.attron(color_pair)
         stdscr.addstr(prompt)
         stdscr.attroff(color_pair)
         stdscr.addstr(input_str)
-        cursor_diff = cursor_x + 1 - max_x if emoji else cursor_x - max_x
-        if cursor_diff >= 2*max_x:
-            new_y = y + 3
-            stdscr.move(new_y, cursor_diff - 2*max_x)
-        elif cursor_diff >= max_x:
-            new_y = y + 2
-            stdscr.move(new_y, cursor_diff - max_x)
-        elif cursor_diff >= 0:
-            new_y = y + 1
-            stdscr.move(new_y, cursor_diff)
-        else:
-            stdscr.move(y, cursor_x + 1 if emoji else cursor_x)  # Move the cursor to the correct position with emoji offset
+
+        # Ensure cursor is within bounds
+        cursor_line = min(cursor_line, max_y - 1)  # Ensure cursor does not go beyond the last line
+        cursor_column = min(cursor_column, max_x - 1)  # Ensure cursor does not go beyond the last column
+
+        # Move the cursor to the calculated position
+        stdscr.move(cursor_line, cursor_column)
+        stdscr.refresh()
         # try:
         #     stdscr.move(y, cursor_x + 1 if emoji else cursor_x)  # Move the cursor to the correct position with emoji offset
         # except curses.error:
         #     stdscr.move(y + 1, cursor_x + 1 - max_x if emoji else cursor_x - max_x)
-    return input_str.strip(), new_y
+    return input_str.strip(), cursor_line
 
 
 # Run a git command and display the output
