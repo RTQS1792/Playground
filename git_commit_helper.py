@@ -86,6 +86,23 @@ def is_git_repository():
         return True
     except subprocess.CalledProcessError:
         return False
+#helper functions
+def process_word_in_backtick(word, processing_words, tick_open, ext_regex):
+    if re.search(ext_regex, word):
+        tick_open = False
+        processing_words.append(word + "`")
+    else:
+        processing_words.append(word)
+    return processing_words, tick_open
+
+def process_word_outside_backtick(word, processed_words, ignored_words, capitalize_mode, idx):
+    if capitalize_mode == "first" and idx == 0:
+        processed_words.append(word.capitalize())
+    elif capitalize_mode == "all":
+        processed_words.append(word if word.lower() in ignored_words else word.capitalize())
+    else:
+        processed_words.append(word.lower())
+    return processed_words
 
 
 # Process the code string to match "`" pairs and apply capitalization
@@ -131,25 +148,9 @@ def process_code_string(title: str, ignored_words: set = None, capitalize_mode: 
             continue
 
         if tick_open:
-            if re.search(ext_regex, word):
-                tick_open = False
-                processing_words.append(word + "`")
-                for pword in processing_words:
-                    processed_words.append(pword)
-                processing_words.clear()
-                continue
-            else:
-                processing_words.append(word)
-                continue
+            processing_words, tick_open = process_word_in_backtick(word, processing_words, tick_open, ext_regex)
         else:
-            # Apply capitalization based on the mode
-            if capitalize_mode == "first" and idx == 0:
-                processed_words.append(word.capitalize())
-            elif capitalize_mode == "all":
-                processed_words.append(word if word.lower() in ignored_words else word.capitalize())
-            else:
-                processed_words.append(word.lower())
-            continue
+            processed_words = process_word_outside_backtick(word, processed_words, ignored_words, capitalize_mode, idx)
 
     # If at the end of the title but tick is still open
     if tick_open:
@@ -165,7 +166,6 @@ def process_code_string(title: str, ignored_words: set = None, capitalize_mode: 
 
     return " ".join(processed_words)
 
-
 # Get directories and files in the current path
 def get_directories_and_files(path):
     try:
@@ -174,70 +174,71 @@ def get_directories_and_files(path):
     except PermissionError:
         return []
 
+#helper functions
+def clear_menu(stdscr, entries, y):
+   for i in range(len(entries)):
+       stdscr.move(y + i, 0)
+       stdscr.clrtoeol()
+   stdscr.refresh()
+
+def handle_key_press(key, current_selection, entries, depth):
+   if key == curses.KEY_UP and current_selection > 0:
+       return current_selection - 1
+   elif key == curses.KEY_DOWN and current_selection < len(entries) - 1:
+       return current_selection + 1
+   elif key == curses.KEY_RIGHT:
+       return "dive"
+   elif key == curses.KEY_LEFT and depth > 0:
+       return "go_back"
+   elif key in [10, 13]: # Enter key
+       return "select"
+   elif key == 27: # Escape key
+       return "exit"
 
 # Recursive function to show the file selection menu
 def show_menu(stdscr, y, x, base_path, current_path, depth=0):
-    # Get directories and files for the current path
-    entries = get_directories_and_files(current_path)
-    current_selection = 0
+   entries = get_directories_and_files(current_path)
+   current_selection = 0
 
-    color_pair_normal = curses.color_pair(6)
-    color_pair_selected = curses.color_pair(4) | curses.A_BOLD  # Bold text for selected item
+   color_pair_normal = curses.color_pair(6)
+   color_pair_selected = curses.color_pair(4) | curses.A_BOLD # Bold text for selected item
 
-    while True:
-        # Display menu items at the current depth
-        for idx, entry in enumerate(entries):
-            if idx == current_selection:
-                stdscr.attron(color_pair_selected)
-            else:
-                stdscr.attron(color_pair_normal)
-            # Display entry with indentation based on depth
-            stdscr.addstr(y + idx, x + (depth * 25), entry)
-            stdscr.attroff(color_pair_selected)
-            stdscr.attroff(color_pair_normal)
-        stdscr.refresh()
-        key = stdscr.getch()
+   while True:
+       for idx, entry in enumerate(entries):
+           if idx == current_selection:
+               stdscr.attron(color_pair_selected)
+           else:
+               stdscr.attron(color_pair_normal)
+           stdscr.addstr(y + idx, x + (depth * 25), entry)
+           stdscr.attroff(color_pair_selected)
+           stdscr.attroff(color_pair_normal)
+       stdscr.refresh()
+       key = stdscr.getch()
 
-        if key == curses.KEY_UP and current_selection > 0:
-            current_selection -= 1
-        elif key == curses.KEY_DOWN and current_selection < len(entries) - 1:
-            current_selection += 1
-        elif key == curses.KEY_RIGHT:
-            # Dive into the directory
-            new_path = os.path.join(current_path, entries[current_selection])
-            if os.path.isdir(new_path):
-                selected = show_menu(stdscr, y, x, base_path, new_path, depth + 1)
-                if selected:
-                    for i in range(len(entries)):
-                        stdscr.move(y + i, 0)
-                        stdscr.clrtoeol()
-                    stdscr.refresh()
-                    return selected
-        elif key == curses.KEY_LEFT and depth > 0:
-            # Clear the menu from the screen
-            for i in range(len(entries)):
-                stdscr.move(y + i, x)
-                stdscr.clrtoeol()
-            # Go back up
-            return None
-        elif key in [10, 13]:  # Enter key
-            # Select the file or directory
-            # Return the relative path from the base path
-            # Clear the menu from the screen
-            for i in range(len(entries)):
-                stdscr.move(y + i, 0)
-                stdscr.clrtoeol()
-            stdscr.refresh()
-            return os.path.relpath(os.path.join(current_path, entries[current_selection]), base_path)
-        elif key == 27:  # Escape key
-            for i in range(len(entries)):
-                stdscr.move(y + i, 0)
-                stdscr.clrtoeol()
-            # Exit menu
-            if depth == 0:
-                return None
-            else:
-                return
+       action = handle_key_press(key, current_selection, entries, depth)
+       if action == current_selection - 1:
+           current_selection -= 1
+       elif action == current_selection + 1:
+           current_selection += 1
+       elif action == "dive":
+           new_path = os.path.join(current_path, entries[current_selection])
+           if os.path.isdir(new_path):
+               selected = show_menu(stdscr, y, x, base_path, new_path, depth + 1)
+               if selected:
+                  clear_menu(stdscr, entries, y)
+                  return selected
+       elif action == "go_back":
+           clear_menu(stdscr, entries, y)
+           return None
+       elif action == "select":
+           clear_menu(stdscr, entries, y)
+           return os.path.relpath(os.path.join(current_path, entries[current_selection]), base_path)
+       elif action == "exit":
+           clear_menu(stdscr, entries, y)
+           if depth == 0:
+               return None
+           else:
+               return
 
 
 # Insert the selected path into the input string
